@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <link rel="stylesheet" href="../css/newton.css" type="text/css">
+    <link href="https://fonts.googleapis.com/css?family=Audiowide|Press+Start+2P|Fjalla+One" rel="stylesheet">
+    <title>Space Looter</title>
+</head>
+<body id='background'>
+    <div id="container">
+        <div id="header">
+            <div id="first" style="display:inline">
+                <a href="../html/arcade.html"> < BACK</a>
+            </div>
+            <h1 id = "last" style="display:inline">
+                Space Loot
+            </h1>
+        </div>
+    
+
+        <div id="screen">
+            <canvas id="gc" width="600" height="600" style="border:10px solid #4B0082;"></canvas>
+        </div>
+    </div>
+
+<script type="text/javascript">
+
+var timestep = 1000 / 60,
+    lastFrameTimeMs = 0,
+    maxFPS = 60,
+	delta = 0,
+	shipPosX = 285,
+	shipPosY = 500,
+	shipAngle = 0,
+    mass = 10,
+    acceleration = 0,
+    accelVector = [0, 0],
+    force = 1.5,
+    resistance = .015,
+    velocity = [0, 0],
+    angleChangeRate = 6,
+    degToRad = Math.PI/180,
+    enemyPosX = 10,
+    enemyPosY = 10,
+    enemyWidth = 20,
+    enemyHeight = 20,
+    enemyVelocity = [0, 0],
+    coinArr = [],
+    coinsMax = 4,
+    coinsCurrent = 0,
+    coinWidth = 10,
+    coinHeight = 10,
+    difficulty = 3,
+    gameOver = false,
+    shipWidth = 30,
+    shipHeight = 30,
+    score = 0;
+  
+var	LEFT = false,
+	RIGHT = false,
+	UP = false,
+	FIRE = false;
+
+
+window.onload=function() {
+    console.log("Loading window");
+	canv=document.getElementById("gc");
+	ctx=canv.getContext("2d"); 
+    
+	rocket = new Image();
+    rocket.online = function(){
+      	imgLoaded=true;
+    }
+    rocket.src="../images/rocket.png";
+    
+	requestAnimationFrame(run);
+}
+
+function run(timestamp){
+  
+    if (timestamp < lastFrameTimeMs + (1000 / maxFPS)) {
+        requestAnimationFrame(run);
+        return;
+    }
+    // Track the accumulated time that hasn't been simulated yet
+    delta += timestamp - lastFrameTimeMs;
+    lastFrameTimeMs = timestamp;
+ 
+    // Simulate the total elapsed time in fixed-size chunks
+    while (delta >= timestep) {
+        update(timestep);
+        delta -= timestep;
+    }
+    draw();
+    requestAnimationFrame(run);
+	
+}
+
+function getCoins(numCoins){
+
+	for(var i = 0; i<numCoins; i++){
+		x=Math.floor(Math.random()*(canv.height - coinHeight));
+        y=Math.floor(Math.random()*(canv.width - coinWidth));
+		coinArr.push({x:x,y:y});
+        coinsCurrent++;
+	}
+}
+
+function update(delta){
+	
+	if( UP == true ){
+        acceleration = force / mass;
+    }
+    else{
+        acceleration = 0;
+    }
+    
+    velocity[0] += Math.sin(shipAngle * degToRad) * acceleration;
+    velocity[1] -= Math.cos(shipAngle * degToRad) * acceleration;
+
+    velMagnitude = Math.sqrt(velocity[0] * velocity[0] + velocity[1] * velocity[1]);
+    if(velMagnitude > 0){
+        velAngle = Math.atan2(velocity[0], velocity[1]);
+        velocity[0] += Math.sin(velAngle + Math.PI) * resistance * velMagnitude;
+        velocity[1] += Math.cos(velAngle + Math.PI) * resistance * velMagnitude;
+    }
+
+    shipPosX += velocity[0];
+    shipPosY += velocity[1];
+
+    //Calculate direction and components of enemy velocity vector
+    sideA = shipPosX - enemyPosX;
+    sideB = shipPosY - enemyPosY;
+    angle = Math.atan2(sideA, sideB);
+    enemyVelocity[0] = Math.sin(angle) * difficulty;
+    enemyVelocity[1] = Math.cos(angle) * difficulty;
+    //Apply enemy vector components to enemy possition
+    enemyPosX += enemyVelocity[0];
+    enemyPosY += enemyVelocity[1];
+
+
+    //Ensure ship remains in boundaries of gamespace
+    if( shipPosX < 0 ){
+        shipPosX = 0;
+        velocity[0] = 0;
+    }
+    else if( shipPosX > canv.width - shipWidth ){
+        shipPosX = canv.width - shipWidth;
+        velocity[0] = 0;
+    }
+    if( shipPosY < 0 ){
+        shipPosY = 0;
+        velocity[1] = 0;
+    }
+    else if( shipPosY > canv.height - shipHeight ){
+        shipPosY = canv.height - shipHeight;
+        velocity[1] = 0;
+    }
+
+    //enemy collision detection
+    if( enemyPosX + enemyWidth >= shipPosX + 2 && enemyPosX + 2 <= shipPosX + shipWidth && enemyPosY + enemyHeight >= shipPosY + 2 && enemyPosY + 2 <= shipPosY + shipWidth  ){
+        gameOver = true;
+    }
+
+    //update coins
+    getCoins(coinsMax - coinsCurrent);
+
+    //coin collision detection
+    for(var i=0; i<coinArr.length; i++){
+        if( coinArr[i].x + coinWidth >= shipPosX && coinArr[i].x <= shipPosX + shipWidth && coinArr[i].y + coinHeight >= shipPosY && coinArr[i].y <= shipPosY + shipWidth ){
+            coinArr.splice(i,1);
+            coinsCurrent--;
+            score += 100;
+			difficulty += score/100000;
+        }
+    }
+	
+
+    //Ensure enemy remains in boundaries of gamespace
+    if( enemyPosX < 0 ){
+        enemyPosX = 0;
+        enemyVelocity[0] = 0;
+    }
+    else if( enemyPosX > canv.width - enemyWidth ){
+        enemyPosX = canv.width - enemyWidth;
+        enemyVelocity[0] = 0;
+    }
+    if( enemyPosY < 0 ){
+        enemyPosY = 0;
+        enemyVelocity[1] = 0;
+    }
+    else if( enemyPosY > canv.height - enemyHeight ){
+        enemyPosY = canv.height - enemyHeight;
+        enemyVelocity[1] = 0;
+    }
+
+    if ( LEFT == true ){
+		shipAngle -= angleChangeRate;
+    }
+	if ( RIGHT == true ){
+		shipAngle += angleChangeRate;
+	}
+}
+
+
+function draw(){
+
+    //console.log(shipPosX + ", " + shipPosY);
+    ctx.save();
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canv.height, canv.width);
+    
+    if(gameOver == true){
+
+		ctx.fillStyle="yellow";
+		ctx.font="18px Georgia";
+		ctx.fillText("score: " + score , canv.width - 150, 15);
+        ctx.fillStyle="red";
+		ctx.font="30px Georgia";
+        ctx.fillText("GAME OVER", canv.width/2 - 75, canv.height/2 - 10);
+      
+        return 0;
+    }
+    else{
+        ctx.fillStyle="yellow";
+		ctx.font="18px Georgia";
+		ctx.fillText("score: " + score , canv.width - 150, 15);
+        shipCenterX = shipPosX + shipWidth/2;
+        shipCenterY = shipPosY + shipHeight/2;
+        ctx.translate(shipCenterX, shipCenterY);
+        ctx.rotate(shipAngle * Math.PI/180);
+        ctx.translate(-shipCenterX, -shipCenterY);
+        ctx.drawImage(rocket, shipPosX, shipPosY, shipWidth, shipHeight);
+        ctx.restore();
+        ctx.fillStyle = 'white';
+        ctx.fillRect(enemyPosX, enemyPosY, enemyWidth, enemyHeight);
+        ctx.fillStyle = 'gold';
+        for(var i = 0; i<coinArr.length; i++){
+            ctx.fillRect(coinArr[i].x, coinArr[i].y, coinWidth, coinHeight);
+        }
+    }
+}
+
+document.onkeydown = function(e) {
+	if(e.keyCode == 37) LEFT = true;
+	if(e.keyCode == 38) UP = true;	
+    if(e.keyCode == 39) RIGHT = true;
+    if(e.keyCode == 32) FIRE = true;
+}
+
+document.onkeyup = function(e) {
+	if(e.keyCode == 37) LEFT = false;
+    if(e.keyCode == 38) UP = false;
+	if(e.keyCode == 39) RIGHT = false;
+    if(e.keyCode == 32){
+		FIRE = false; 
+		bulletCounter=0;
+	} 
+}
+
+window.addEventListener("keydown", function(e) {
+    // space and arrow keys
+    if([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
+        e.preventDefault();
+    }
+}, false);
+
+
+</script>
+</body>
+</html>	
+
+
